@@ -228,6 +228,20 @@ RCT_EXPORT_METHOD(peerConnectionSetRemoteDescription : (nonnull NSNumber *)objec
         return;
     }
 
+    /* * * * * * * * * Patch * * * * * * * * * */
+    NSError *audioSessionError = nil;
+    AVAudioSession *session = [AVAudioSession sharedInstance];
+    BOOL success = [session setCategory:AVAudioSessionCategoryPlayback
+                            withOptions:(AVAudioSessionCategoryOptionMixWithOthers | AVAudioSessionCategoryOptionDuckOthers)
+                                  error:&audioSessionError];
+
+    if (!success || audioSessionError) {
+        NSLog(@"[WebRTC] Failed to override AVAudioSession: %@", audioSessionError);
+    } else {
+        NSLog(@"[WebRTC] AVAudioSession category set to Playback with mix/duck");
+    }
+    /* * * * * * * * End of Patch * * * * * * * */
+
     NSMutableArray *receiversIds = [NSMutableArray new];
     for (RTCRtpTransceiver *transceiver in peerConnection.transceivers) {
         [receiversIds addObject:transceiver.receiver.receiverId];
