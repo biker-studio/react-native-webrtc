@@ -267,20 +267,31 @@ RCT_EXPORT_METHOD(peerConnectionSetRemoteDescription : (nonnull NSNumber *)objec
     };
 
     [peerConnection setRemoteDescription:desc completionHandler:handler];
+}
 
-    /* * * * * * * * * Patch * * * * * * * * * */
+
+RCT_EXPORT_METHOD(peerConnectionAllowMusic)
+{
     NSError *audioSessionError = nil;
     AVAudioSession *session = [AVAudioSession sharedInstance];
     BOOL success = [session setCategory:AVAudioSessionCategoryPlayback
-                            withOptions:(AVAudioSessionCategoryOptionMixWithOthers | AVAudioSessionCategoryOptionDuckOthers)
+                            withOptions:AVAudioSessionCategoryOptionDuckOthers
                                   error:&audioSessionError];
 
     if (!success || audioSessionError) {
         NSLog(@"[WebRTC] Failed to override AVAudioSession: %@", audioSessionError);
     } else {
-        NSLog(@"[WebRTC] AVAudioSession category set to Playback with mix/duck");
+        NSLog(@"[WebRTC] AVAudioSession category set to Playback with DuckOthers");
     }
-    /* * * * * * * * End of Patch * * * * * * * */
+
+    NSError *activationError = nil;
+    success = [session setActive:YES error:&activationError];
+
+    if (!success || activationError) {
+        NSLog(@"[WebRTC] Failed to activate AVAudioSession: %@", activationError);
+    } else {
+        NSLog(@"[WebRTC] AVAudioSession activated");
+    }
 }
 
 RCT_EXPORT_METHOD(peerConnectionAddICECandidate : (nonnull NSNumber *)objectID candidate : (RTCIceCandidate *)

@@ -325,6 +325,15 @@ export default class RTCPeerConnection extends EventTarget<RTCPeerConnectionEven
         log.debug(`${this._pcId} setRemoteDescription OK`);
     }
 
+    async allowBackgroundMusic(): Promise<void> {
+        log.debug(`${this._pcId} allowBackgroundMusic`);
+
+        const result = await WebRTCModule.peerConnectionAllowBackgroundMusic(this._pcId);
+        if (!result) {
+            throw new Error('Could not allow background music');
+        }
+    }
+
     async addIceCandidate(candidate): Promise<void> {
         log.debug(`${this._pcId} addIceCandidate`);
 
