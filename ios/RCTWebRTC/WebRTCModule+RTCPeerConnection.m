@@ -266,6 +266,8 @@ RCT_EXPORT_METHOD(peerConnectionSetRemoteDescription : (nonnull NSNumber *)objec
         });
     };
 
+    [peerConnection setRemoteDescription:desc completionHandler:handler];
+
     /* * * * * * * * * Patch * * * * * * * * * */
     NSError *audioSessionError = nil;
     AVAudioSession *session = [AVAudioSession sharedInstance];
@@ -279,8 +281,6 @@ RCT_EXPORT_METHOD(peerConnectionSetRemoteDescription : (nonnull NSNumber *)objec
         NSLog(@"[WebRTC] AVAudioSession category set to Playback with mix/duck");
     }
     /* * * * * * * * End of Patch * * * * * * * */
-
-    [peerConnection setRemoteDescription:desc completionHandler:handler];
 }
 
 RCT_EXPORT_METHOD(peerConnectionAddICECandidate : (nonnull NSNumber *)objectID candidate : (RTCIceCandidate *)
