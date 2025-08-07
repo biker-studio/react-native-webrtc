@@ -328,7 +328,7 @@ export default class RTCPeerConnection extends EventTarget<RTCPeerConnectionEven
     async allowBackgroundMusic(): Promise<void> {
         log.debug(`${this._pcId} allowBackgroundMusic`);
 
-        const result = await WebRTCModule.peerConnectionAllowBackgroundMusic(this._pcId);
+        const result = await WebRTCModule.peerConnectionAllowBackgroundMusic();
         if (!result) {
             throw new Error('Could not allow background music');
         }
