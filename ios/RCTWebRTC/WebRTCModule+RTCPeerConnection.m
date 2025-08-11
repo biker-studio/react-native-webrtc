@@ -14,6 +14,8 @@
 #import <WebRTC/RTCRtpTransceiver.h>
 #import <WebRTC/RTCSessionDescription.h>
 #import <WebRTC/RTCStatisticsReport.h>
+#import <WebRTC/RTCAudioSession.h>
+#import <WebRTC/RTCAudioSessionConfiguration.h>
 
 #import "SerializeUtils.h"
 #import "WebRTCModule+RTCDataChannel.h"
@@ -78,6 +80,19 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(peerConnectionInit : (RTCConfiguration *)
     __block BOOL ret = YES;
 
     dispatch_sync(self.workerQueue, ^{
+        // Ensure WebRTC's audio session mixes with other audio BEFORE any PC/audio unit spins up
+        RTCAudioSession *rtcAudioSession = [RTCAudioSession sharedInstance];
+        RTCAudioSessionConfiguration *rtcConfig = [RTCAudioSessionConfiguration webRTCConfiguration];
+        rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionMixWithOthers;     // do not pause other audio
+        rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionDuckOthers;        // optional: lower other audio
+        [rtcAudioSession lockForConfiguration];
+        NSError *rtcAudioError = nil;
+        [rtcAudioSession setConfiguration:rtcConfig error:&rtcAudioError];
+        [rtcAudioSession unlockForConfiguration];
+        if (rtcAudioError) {
+            RCTLogWarn(@"[WebRTC] Failed to set RTCAudioSession mixing config: %@", rtcAudioError);
+        }
+
         RTCMediaConstraints *constraints = [[RTCMediaConstraints alloc] initWithMandatoryConstraints:nil
                                                                                  optionalConstraints:nil];
         RTCPeerConnection *peerConnection = [self.peerConnectionFactory peerConnectionWithConfiguration:configuration
@@ -267,35 +282,6 @@ RCT_EXPORT_METHOD(peerConnectionSetRemoteDescription : (nonnull NSNumber *)objec
     };
 
     [peerConnection setRemoteDescription:desc completionHandler:handler];
-}
-
-
-RCT_EXPORT_METHOD(peerConnectionAllowBackgroundMusic:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
-{
-    NSError *audioSessionError = nil;
-    AVAudioSession *session = [AVAudioSession sharedInstance];
-    BOOL success = [session setCategory:AVAudioSessionCategoryPlayback
-                            withOptions:AVAudioSessionCategoryOptionDuckOthers
-                                  error:&audioSessionError];
-
-    if (!success || audioSessionError) {
-        NSLog(@"[WebRTC] Failed to override AVAudioSession: %@", audioSessionError);
-        reject(@"audio_error", @"Failed to set audio session category", audioSessionError);
-        return;
-    }
-
-    NSError *activationError = nil;
-    success = [session setActive:YES error:&activationError];
-
-    if (!success || activationError) {
-        NSLog(@"[WebRTC] Failed to activate AVAudioSession: %@", activationError);
-        reject(@"activation_error", @"Failed to activate audio session", activationError);
-        return;
-    }
-
-    NSLog(@"[WebRTC] AVAudioSession category set and activated");
-    resolve(@(YES));
 }
 
 RCT_EXPORT_METHOD(peerConnectionAddICECandidate : (nonnull NSNumber *)objectID candidate : (RTCIceCandidate *)
