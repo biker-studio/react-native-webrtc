@@ -95,6 +95,7 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(peerConnectionInit : (RTCConfiguration *)
         // Take manual control of audio activation so we don't affect other audio until we actually play speech
         [rtcAudioSession lockForConfiguration];
         rtcAudioSession.useManualAudio = YES;
+        [rtcAudioSession setIsAudioEnabled:YES];
         NSError *deactivateError = nil;
         BOOL deactivated = [rtcAudioSession setActive:NO error:&deactivateError];
         [rtcAudioSession unlockForConfiguration];
@@ -954,6 +955,8 @@ RCT_EXPORT_METHOD(peerConnectionAudioStart:(BOOL)duck
     [rtcAudioSession lockForConfiguration];
     NSError *configError = nil;
     [rtcAudioSession setConfiguration:rtcConfig error:&configError];
+    // Ensure the ADM is enabled before activation so playback can start
+    [rtcAudioSession setIsAudioEnabled:YES];
     NSError *activationError = nil;
     BOOL activated = [rtcAudioSession setActive:YES error:&activationError];
     [rtcAudioSession unlockForConfiguration];
@@ -978,6 +981,8 @@ RCT_EXPORT_METHOD(peerConnectionAudioStop:(RCTPromiseResolveBlock)resolve
     [rtcAudioSession lockForConfiguration];
     NSError *err = nil;
     BOOL success = [rtcAudioSession setActive:NO error:&err];
+    // Optionally disable to fully stop audio unit while idle
+    [rtcAudioSession setIsAudioEnabled:NO];
     [rtcAudioSession unlockForConfiguration];
 
     if (!success || err) {
