@@ -93,11 +93,12 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(peerConnectionInit : (RTCConfiguration *)
         }
 
         // Take manual control of audio activation so we don't affect other audio until we actually play speech
+        [rtcAudioSession lockForConfiguration];
         rtcAudioSession.useManualAudio = YES;
-        // Ensure the session is not active on init
         NSError *deactivateError = nil;
-        [rtcAudioSession setActive:NO error:&deactivateError];
-        if (deactivateError) {
+        BOOL deactivated = [rtcAudioSession setActive:NO error:&deactivateError];
+        [rtcAudioSession unlockForConfiguration];
+        if (!deactivated || deactivateError) {
             RCTLogWarn(@"[WebRTC] Failed to deactivate RTCAudioSession on init: %@", deactivateError);
         }
 
