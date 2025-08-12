@@ -83,7 +83,11 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(peerConnectionInit : (RTCConfiguration *)
         // Ensure WebRTC's audio session mixes with other audio BEFORE any PC/audio unit spins up
         RTCAudioSession *rtcAudioSession = [RTCAudioSession sharedInstance];
         RTCAudioSessionConfiguration *rtcConfig = [RTCAudioSessionConfiguration webRTCConfiguration];
-        rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionMixWithOthers;     // do not pause other audio
+        rtcConfig.category = AVAudioSessionCategoryPlayback;
+        rtcConfig.mode = AVAudioSessionModeDefault;
+        // Ensure only MixWithOthers by default (no DuckOthers on init)
+        rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionMixWithOthers;
+        rtcConfig.categoryOptions &= ~AVAudioSessionCategoryOptionDuckOthers;
         [rtcAudioSession lockForConfiguration];
         NSError *rtcAudioError = nil;
         [rtcAudioSession setConfiguration:rtcConfig error:&rtcAudioError];
@@ -95,7 +99,7 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(peerConnectionInit : (RTCConfiguration *)
         // Take manual control of audio activation so we don't affect other audio until we actually play speech
         [rtcAudioSession lockForConfiguration];
         rtcAudioSession.useManualAudio = YES;
-        [rtcAudioSession setIsAudioEnabled:YES];
+        [rtcAudioSession setIsAudioEnabled:NO];
         NSError *deactivateError = nil;
         BOOL deactivated = [rtcAudioSession setActive:NO error:&deactivateError];
         [rtcAudioSession unlockForConfiguration];
@@ -947,9 +951,13 @@ RCT_EXPORT_METHOD(peerConnectionAudioStart:(BOOL)duck
 {
     RTCAudioSession *rtcAudioSession = [RTCAudioSession sharedInstance];
     RTCAudioSessionConfiguration *rtcConfig = [RTCAudioSessionConfiguration webRTCConfiguration];
+    rtcConfig.category = AVAudioSessionCategoryPlayback;
+    rtcConfig.mode = AVAudioSessionModeDefault;
     rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionMixWithOthers;
     if (duck) {
         rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionDuckOthers;
+    } else {
+        rtcConfig.categoryOptions &= ~AVAudioSessionCategoryOptionDuckOthers;
     }
 
     [rtcAudioSession lockForConfiguration];
@@ -986,8 +994,8 @@ RCT_EXPORT_METHOD(peerConnectionAudioStop:(RCTPromiseResolveBlock)resolve
     [rtcAudioSession unlockForConfiguration];
 
     if (!success || err) {
-        reject(@"deactivation_error", @"Failed to deactivate RTCAudioSession", err);
-        return;
+        NSLog(@"[WebRTC] Warning: deactivate returned error: %@", err);
+        // Resolve anyway to avoid breaking JS promise chains; session will be deactivated on next start/teardown.
     }
     resolve(@(YES));
 }
