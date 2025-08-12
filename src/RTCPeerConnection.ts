@@ -325,13 +325,14 @@ export default class RTCPeerConnection extends EventTarget<RTCPeerConnectionEven
         log.debug(`${this._pcId} setRemoteDescription OK`);
     }
 
-    async setDucking(enabled: boolean): Promise<void> {
-        log.debug(`${this._pcId} setDucking ${enabled}`);
+    async audioStart(duck: boolean = true): Promise<void> {
+        const result = await WebRTCModule.peerConnectionAudioStart(Boolean(duck));
+        if (!result) throw new Error('Could not start WebRTC audio session');
+    }
 
-        const result = await WebRTCModule.peerConnectionSetDucking(Boolean(enabled));
-        if (!result) {
-            throw new Error('Could not set ducking state');
-        }
+    async audioStop(): Promise<void> {
+        const result = await WebRTCModule.peerConnectionAudioStop();
+        if (!result) throw new Error('Could not stop WebRTC audio session');
     }
 
     async addIceCandidate(candidate): Promise<void> {
