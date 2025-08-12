@@ -92,6 +92,15 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(peerConnectionInit : (RTCConfiguration *)
             RCTLogWarn(@"[WebRTC] Failed to set RTCAudioSession mixing config: %@", rtcAudioError);
         }
 
+        // Take manual control of audio activation so we don't affect other audio until we actually play speech
+        rtcAudioSession.useManualAudio = YES;
+        // Ensure the session is not active on init
+        NSError *deactivateError = nil;
+        [rtcAudioSession setActive:NO error:&deactivateError];
+        if (deactivateError) {
+            RCTLogWarn(@"[WebRTC] Failed to deactivate RTCAudioSession on init: %@", deactivateError);
+        }
+
         RTCMediaConstraints *constraints = [[RTCMediaConstraints alloc] initWithMandatoryConstraints:nil
                                                                                  optionalConstraints:nil];
         RTCPeerConnection *peerConnection = [self.peerConnectionFactory peerConnectionWithConfiguration:configuration
@@ -927,6 +936,54 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(peerConnectionRemoveTrack : (nonnull NSNu
 
 - (void)peerConnection:(nonnull RTCPeerConnection *)peerConnection didRemoveStream:(nonnull RTCMediaStream *)stream {
     // Unused in Unified Plan.
+}
+
+// Activate WebRTC audio session only when we intend to play audio; optionally duck others while active
+RCT_EXPORT_METHOD(peerConnectionAudioStart:(BOOL)duck
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    RTCAudioSession *rtcAudioSession = [RTCAudioSession sharedInstance];
+    RTCAudioSessionConfiguration *rtcConfig = [RTCAudioSessionConfiguration webRTCConfiguration];
+    rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionMixWithOthers;
+    if (duck) {
+        rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionDuckOthers;
+    }
+
+    [rtcAudioSession lockForConfiguration];
+    NSError *configError = nil;
+    [rtcAudioSession setConfiguration:rtcConfig error:&configError];
+    NSError *activationError = nil;
+    BOOL activated = [rtcAudioSession setActive:YES error:&activationError];
+    [rtcAudioSession unlockForConfiguration];
+
+    if (configError) {
+        reject(@"audio_error", @"Failed to configure RTCAudioSession", configError);
+        return;
+    }
+    if (!activated || activationError) {
+        reject(@"activation_error", @"Failed to activate RTCAudioSession", activationError);
+        return;
+    }
+
+    resolve(@(YES));
+}
+
+// Deactivate the audio session to stop affecting other audio when idle
+RCT_EXPORT_METHOD(peerConnectionAudioStop:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    RTCAudioSession *rtcAudioSession = [RTCAudioSession sharedInstance];
+    [rtcAudioSession lockForConfiguration];
+    NSError *err = nil;
+    BOOL success = [rtcAudioSession setActive:NO error:&err];
+    [rtcAudioSession unlockForConfiguration];
+
+    if (!success || err) {
+        reject(@"deactivation_error", @"Failed to deactivate RTCAudioSession", err);
+        return;
+    }
+    resolve(@(YES));
 }
 
 // Exported method to allow toggling ducking on demand
