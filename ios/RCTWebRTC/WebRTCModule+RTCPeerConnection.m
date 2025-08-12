@@ -84,7 +84,6 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(peerConnectionInit : (RTCConfiguration *)
         RTCAudioSession *rtcAudioSession = [RTCAudioSession sharedInstance];
         RTCAudioSessionConfiguration *rtcConfig = [RTCAudioSessionConfiguration webRTCConfiguration];
         rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionMixWithOthers;     // do not pause other audio
-        rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionDuckOthers;        // optional: lower other audio
         [rtcAudioSession lockForConfiguration];
         NSError *rtcAudioError = nil;
         [rtcAudioSession setConfiguration:rtcConfig error:&rtcAudioError];
@@ -928,6 +927,45 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(peerConnectionRemoveTrack : (nonnull NSNu
 
 - (void)peerConnection:(nonnull RTCPeerConnection *)peerConnection didRemoveStream:(nonnull RTCMediaStream *)stream {
     // Unused in Unified Plan.
+}
+
+// Exported method to allow toggling ducking on demand
+RCT_EXPORT_METHOD(peerConnectionSetDucking:(BOOL)enabled
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    RTCAudioSession *rtcAudioSession = [RTCAudioSession sharedInstance];
+    RTCAudioSessionConfiguration *rtcConfig = [RTCAudioSessionConfiguration webRTCConfiguration];
+
+    // Always allow mixing; add or remove ducking based on flag
+    rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionMixWithOthers;
+    if (enabled) {
+        rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionDuckOthers;
+    } else {
+        rtcConfig.categoryOptions &= ~AVAudioSessionCategoryOptionDuckOthers;
+    }
+
+    [rtcAudioSession lockForConfiguration];
+    NSError *configError = nil;
+    [rtcAudioSession setConfiguration:rtcConfig error:&configError];
+
+    // Re-activate to apply immediately without tearing down PC
+    NSError *activationError = nil;
+    BOOL activated = [rtcAudioSession setActive:YES error:&activationError];
+    [rtcAudioSession unlockForConfiguration];
+
+    if (configError) {
+        NSLog(@"[WebRTC] Failed to update ducking: %@", configError);
+        reject(@"audio_error", @"Failed to update ducking", configError);
+        return;
+    }
+    if (!activated || activationError) {
+        NSLog(@"[WebRTC] Failed to (re)activate RTCAudioSession: %@", activationError);
+        reject(@"activation_error", @"Failed to (re)activate RTCAudioSession", activationError);
+        return;
+    }
+
+    resolve(@(enabled));
 }
 
 @end

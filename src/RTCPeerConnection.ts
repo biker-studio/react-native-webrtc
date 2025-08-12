@@ -334,6 +334,15 @@ export default class RTCPeerConnection extends EventTarget<RTCPeerConnectionEven
         }
     }
 
+    async setDucking(enabled: boolean): Promise<void> {
+        log.debug(`${this._pcId} setDucking ${enabled}`);
+
+        const result = await WebRTCModule.peerConnectionSetDucking(Boolean(enabled));
+        if (!result) {
+            throw new Error('Could not set ducking state');
+        }
+    }
+
     async addIceCandidate(candidate): Promise<void> {
         log.debug(`${this._pcId} addIceCandidate`);
 
