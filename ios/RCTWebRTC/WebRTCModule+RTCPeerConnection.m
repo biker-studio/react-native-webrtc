@@ -82,20 +82,6 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(peerConnectionInit : (RTCConfiguration *)
     dispatch_sync(self.workerQueue, ^{
         // Ensure WebRTC's audio session mixes with other audio BEFORE any PC/audio unit spins up
         RTCAudioSession *rtcAudioSession = [RTCAudioSession sharedInstance];
-        RTCAudioSessionConfiguration *rtcConfig = [RTCAudioSessionConfiguration webRTCConfiguration];
-        rtcConfig.category = AVAudioSessionCategoryPlayback;
-        rtcConfig.mode = AVAudioSessionModeDefault;
-        // Ensure only MixWithOthers by default (no DuckOthers on init)
-        rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionMixWithOthers;
-        rtcConfig.categoryOptions &= ~AVAudioSessionCategoryOptionDuckOthers;
-        [rtcAudioSession lockForConfiguration];
-        NSError *rtcAudioError = nil;
-        [rtcAudioSession setConfiguration:rtcConfig error:&rtcAudioError];
-        [rtcAudioSession unlockForConfiguration];
-        if (rtcAudioError) {
-            RCTLogWarn(@"[WebRTC] Failed to set RTCAudioSession mixing config: %@", rtcAudioError);
-        }
-
         // Take manual control of audio activation so we don't affect other audio until we actually play speech
         [rtcAudioSession lockForConfiguration];
         rtcAudioSession.useManualAudio = YES;
@@ -951,8 +937,7 @@ RCT_EXPORT_METHOD(peerConnectionAudioStart:(BOOL)duck
 {
     RTCAudioSession *rtcAudioSession = [RTCAudioSession sharedInstance];
     RTCAudioSessionConfiguration *rtcConfig = [RTCAudioSessionConfiguration webRTCConfiguration];
-    rtcConfig.category = AVAudioSessionCategoryPlayback;
-    rtcConfig.mode = AVAudioSessionModeDefault;
+    // Keep WebRTC's default category/mode; only add mixing/ducking options
     rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionMixWithOthers;
     if (duck) {
         rtcConfig.categoryOptions |= AVAudioSessionCategoryOptionDuckOthers;
